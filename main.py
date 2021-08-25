@@ -1,16 +1,22 @@
+import asyncio
+import logging
 import os
 import itertools
+
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 import discord
-import asyncio
 import feedparser
 import pytz
 import yaml
 
+logger = logging.getLogger('rss2discord')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s [%(levelname)s] (%(name)s) %(message)s')
 
-class MyClient(discord.Client):
+
+class Rss2DiscordClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -28,21 +34,28 @@ class MyClient(discord.Client):
             self.sites = yaml.safe_load(f)
 
     async def on_ready(self):
-        print(f'Logged in as {self.user} (ID: {self.user.id})')
-        print('------')
+        logger.info(f'Logged in as {self.user} (ID: {self.user.id})')
 
     async def fetch_rss_contents(self, url, threshold_date):
         feed = await self.loop.run_in_executor(None, feedparser.parse, url)
+        logger.info('[%s] Fetched RSS', url)
 
         def parse_date(t):
             return datetime(*t[:6], tzinfo=pytz.utc)
 
+        # TODO 出稿日時が3分前ではないものに対してどう対処するか考える
+        #      例: Qiita急上昇 = 新着通知ではないので時間が3分より前のものしか含まれない
         site_name = feed['feed']['title']
+        entries = [e for e in feed['entries'] if parse_date(e.published_parsed) > threshold_date]
+
+        logger.info('[%s] Filtered %d of %d "%s" contents',
+                    url, len(entries), len(feed['entries']), site_name)
+
         return [discord.Embed(type='rich',
                               title=e.title,
                               url=e.link,
                               description=e.summary).set_author(name=site_name)
-                for e in feed['entries'] if parse_date(e.published_parsed) > threshold_date]
+                for e in entries]
 
     async def _init(self):
         for guild in self.guilds:
@@ -76,9 +89,9 @@ class MyClient(discord.Client):
                             await c.send(embed=embed)
 
                 await asyncio.sleep(self.duration)
-        except Exception as e:
-            print(e)
+        except:
+            logging.exception()
 
 
-client = MyClient()
+client = Rss2DiscordClient()
 client.run(os.getenv('TOKEN'))
