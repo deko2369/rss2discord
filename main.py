@@ -88,8 +88,10 @@ class Rss2DiscordClient(discord.Client):
                             await c.send(embed=embed)
 
                 await asyncio.sleep(self.duration)
+        except asyncio.CancelledError:
+            logger.info('Shutdown background task')
         except:
-            logging.exception()
+            logger.exception('Background task error')
 
 
 client = Rss2DiscordClient()
