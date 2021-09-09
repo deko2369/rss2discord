@@ -44,7 +44,7 @@ class Rss2DiscordClient(discord.Client):
 
         # TODO 出稿日時が3分前ではないものに対してどう対処するか考える
         #      例: Qiita急上昇 = 新着通知ではないので時間が3分より前のものしか含まれない
-        site_name = feed['feed']['title']
+        site_name = feed['feed'].get('title', 'Non Title')
         entries = [e for e in feed['entries'] if parse_date(e.published_parsed) > threshold_date]
 
         logger.info('[%s] Filtered %d of %d "%s" contents',
